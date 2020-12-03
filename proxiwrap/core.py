@@ -1,5 +1,8 @@
 """Core functionality for the proxiwrap package."""
 
+from typing import Type, List
+from collections.abc import Callable
+
 
 # Wrapper approach based on:
 # https://gist.github.com/kyouko-taiga/de5ece0792d2f5fe8fb3
@@ -49,40 +52,49 @@ class WrapperBase(type):
 
 # ==== CachedExperimentRun class (including wrapper base class) ====
 
-class CachedExperimentRun(metaclass=WrapperBase):
 
-    # This class acts as a proxy for the wrapped instance it is passed. All
-    # access to its attributes are delegated to the wrapped class, except
-    # those contained in __overrides__.
+def build_proxy_class(
+    classname: str,
+    overrides: List[Callable],
+):
+    """Blah."""
+    class Wrapper(metaclass=WrapperBase):
+        """Wraps an object."""
 
-    __slots__ = ['_wrapped', '__weakref__']
-    __overrides__ = ['end_run', 'experiment_run']
+        # This class acts as a proxy for the wrapped instance it is passed. All
+        # access to its attributes are delegated to the wrapped class, except
+        # those contained in __overrides__.
 
-    def __init__(self, wrapped):
-        object.__setattr__(self, '_wrapped', wrapped)
+        __slots__ = ['_wrapped', '__weakref__']
+        __override_names__ = [f.__name__ for f in overrides]
+        __overrides__ = {f.__name__: f for f in overrides}
 
-    def __getattribute__(self, attr):
-        if attr in object.__getattribute__(self, '__overrides__'):
-            return object.__getattribute__(self, attr)
+        def __init__(self, wrapped):
+            object.__setattr__(self, '_wrapped', wrapped)
 
-        # If the requested attribute wasn't overriden, then we delegate to
-        # the wrapped class.
-        return getattr(object.__getattribute__(self, '_wrapped'), attr)
+        def __getattribute__(self, attr):
+            if attr in object.__getattribute__(self, '__override_names__'):
+                return object.__getattribute__(self, '__overrides__')[attr]
 
-    def __setattr__(self, attr, value):
-        setattr(object.__getattribute__(self, '_wrapped'), attr, value)
+            # If the requested attribute wasn't overriden, then we delegate to
+            # the wrapped class.
+            return getattr(object.__getattribute__(self, '_wrapped'), attr)
 
-    def __nonzero__(self):
-        return bool(object.__getattribute__(self, '_wrapped'))
+        def __setattr__(self, attr, value):
+            setattr(object.__getattribute__(self, '_wrapped'), attr, value)
 
-    def __str__(self):
-        return str(object.__getattribute__(self, '_wrapped'))
+        def __nonzero__(self):
+            return bool(object.__getattribute__(self, '_wrapped'))
 
-    def __repr__(self):
-        return repr(object.__getattribute__(self, '_wrapped'))
+        def __str__(self):
+            return str(object.__getattribute__(self, '_wrapped'))
 
-    def end_run(self, **kwargs):
-        return 'cached_run!'
+        def __repr__(self):
+            return repr(object.__getattribute__(self, '_wrapped'))
 
-    def experiment_run(self):
-        return object.__getattribute__(self, '_wrapped')
+        def _wrapped_obj(self):
+            """Returns the wrapped object."""
+            return object.__getattribute__(self, '_wrapped')
+
+    Wrapper.__name__ = classname
+    return Wrapper
